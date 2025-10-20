@@ -66,7 +66,7 @@
           if (error.errno == 19) {
             logger.info(`user creation failed as '${username}' already exists`);
             res.status(409).json({
-              message: "username not unique",
+              message: "an user with this username already exists! please choose another one.",
               error: true,
             });
             next();
