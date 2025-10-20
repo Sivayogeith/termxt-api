@@ -26,6 +26,16 @@
     driver: sqlite3.Database,
   });
 
+  const encrypt = (message, password) => {
+    const d = crypto.createHash("sha512").update(password).digest(); // 64 bytes
+    const key = d.slice(0, 32);
+    const iv = d.slice(32, 48);
+    const c = crypto.createCipheriv("aes-256-cbc", key, iv);
+    let out = c.update(message, "utf8", "hex");
+    out += c.final("hex");
+    return out;
+  };
+
   app.post("/user/register", (req, res, next) => {
     const { username, password } = req.body;
     const code = crypto.randomBytes(16).toString("hex");
@@ -37,17 +47,18 @@
       ])
         .then(() => {
           logger.info(`user created '${username}'`);
-          res
-            .status(200)
-            .json({ data: { username, code }, error: false, message: "registered, welcome!" });
+          res.status(200).json({
+            data: { username, code },
+            error: false,
+            message: "registered, welcome!",
+          });
           next();
         })
         .catch((error) => {
           if (error.errno == 19) {
             logger.info(`user creation failed as '${username}' already exists`);
             res.status(409).json({
-              message:
-                "username not unique",
+              message: "username not unique",
               error: true,
             });
             next();
@@ -88,9 +99,47 @@
     });
   });
 
-  app.ws("/", (ws, req) => {
-    ws.on("message", function (msg) {
-      ws.send(msg);
+  app.get("/user/exists", (req, res) => {
+    const { username } = req.query;
+    db.get("SELECT * FROM users WHERE username = ?", username).then((user) => {
+      if (!user) {
+        logger.info(`${username} doesn't exist`);
+        return res.status(404).send(0);
+      }
+      logger.info(`${username} exists`);
+      res.status(200).send(1);
+    });
+  });
+
+  const clients = new Set();
+
+  app.ws("/chat", (ws, req) => {
+    clients.add(ws);
+    console.log("Client connected");
+
+    ws.on("message", (msg) => {
+      msg = JSON.parse(msg);
+      // msg: { message: string, to: string, from: string }
+
+      db.get("SELECT code FROM users WHERE username = ?", msg["to"]).then(
+        (user) => {
+          if (!user) {
+            logger.info(`${username} doesn't exist (websocket)`);
+            return
+          }
+          msg["message"] = encrypt(msg["message"], user.code);
+          for (const client of clients) {
+            if (client.readyState === 1) {
+              client.send(JSON.stringify(msg));
+            }
+          }
+        }
+      );
+    });
+
+    ws.on("close", () => {
+      clients.delete(ws);
+      console.log("Client disconnected");
     });
   });
 
