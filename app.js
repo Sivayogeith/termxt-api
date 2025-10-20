@@ -20,6 +20,14 @@
       new winston.transports.File({ filename: "secret.log" }),
     ],
   });
+  const chatLogger = winston.createLogger({
+    level: "info",
+    format: winston.format.simple(),
+    transports: [
+      new winston.transports.Console(),
+      new winston.transports.File({ filename: "chat.log" }),
+    ],
+  });
 
   const db = await open({
     filename: "./users.db",
@@ -28,8 +36,8 @@
 
   const encrypt = (message, password) => {
     const d = crypto.createHash("sha512").update(password).digest(); // 64 bytes
-    const key = d.slice(0, 32);
-    const iv = d.slice(32, 48);
+    const key = d.subarray(0, 32);
+    const iv = d.subarray(32, 48);
     const c = crypto.createCipheriv("aes-256-cbc", key, iv);
     let out = c.update(message, "utf8", "hex");
     out += c.final("hex");
@@ -92,7 +100,7 @@
             data: { username: user.username, code: user.code },
           });
         } else {
-          logger.info(`some tried to break into ${username}! (maybe)`);
+          logger.info(`someone tried to break into ${username}! (maybe)`);
           res.status(403).json({ message: "wrong password", error: true });
         }
       });
@@ -127,6 +135,8 @@
             logger.info(`${username} doesn't exist (websocket)`);
             return
           }
+          // I get to read everyone's messages in case there is someone breaking HC's CoC (or if the Department of Homeland Security is doing a investigation on this)
+          chatLogger.info(JSON.stringify(msg))
           msg["message"] = encrypt(msg["message"], user.code);
           for (const client of clients) {
             if (client.readyState === 1) {
