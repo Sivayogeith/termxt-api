@@ -16,3 +16,4 @@ This project is the API of TermXT - an terminal direct messaging app
     - response format (404): `0`
 - **/chat** - WS main chat websocket
     - message format: `{ message: string, to: string, format: string }`
+- **/** - GET documentation of the API

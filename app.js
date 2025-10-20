@@ -66,7 +66,8 @@
           if (error.errno == 19) {
             logger.info(`user creation failed as '${username}' already exists`);
             res.status(409).json({
-              message: "an user with this username already exists! please choose another one.",
+              message:
+                "an user with this username already exists! please choose another one.",
               error: true,
             });
             next();
@@ -133,10 +134,10 @@
         (user) => {
           if (!user) {
             logger.info(`${username} doesn't exist (websocket)`);
-            return
+            return;
           }
           // I get to read everyone's messages in case there is someone breaking HC's CoC (or if the Department of Homeland Security is doing a investigation on this)
-          chatLogger.info(JSON.stringify(msg))
+          chatLogger.info(JSON.stringify(msg));
           msg["message"] = encrypt(msg["message"], user.code);
           for (const client of clients) {
             if (client.readyState === 1) {
@@ -151,6 +152,43 @@
       clients.delete(ws);
       console.log("Client disconnected");
     });
+  });
+
+  app.get("/", (req, res) => {
+    const view = `
+    <h1>Welcome to TermXT API!</h1>
+
+    <b>/user/register</b> - POST create an user
+    <ul>
+      <li>body format: <code>{ username: string, password: string }</code></li>
+      <li>response format (200): <code>{ message: string, data: { username: string, code: string }, error: false }</code></li>
+      <li>response format (400/409): <code>{ message: string, error: true }</code></li>
+    </ul>
+
+    <b>/user/login</b> - POST login into an existing user
+    <ul>
+      <li>body format: <code>{ username: string, password: string }</code></li>
+      <li>response format (200): <code>{ message: string, data: { username: string, code: string }, error: false }</code></li>
+      <li>response format (403/404): <code>{ message: string, error: true }</code></li>
+    </ul>
+
+    <b>/user/exists?username</b> - GET checks if an username exists
+    <ul>
+      <li>query param: <code>{ username: string }</code></li>
+      <li>response format (200): <code>1</code></li>
+      <li>response format (404): <code>0</code></li>
+    </ul>
+
+    <b>/chat</b> - WS main chat websocket
+    <ul>
+      <li>message format: <code>{ message: string, to: string, format: string }</code></li>
+    </ul>
+
+
+    <b>/</b> - GET this page!!!, documentation of the API
+
+    `;
+    res.status(200).send(view);
   });
 
   app.listen(3443, () => {
